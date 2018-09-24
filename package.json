@@ -1,0 +1,20 @@
+{
+  "name": "tvshow-tracker",
+  "version": "1.0.0",
+  "description": "A comprehensive coverage of tv-shows",
+  "main": "index.js",
+  "scripts": {
+    "test": "check hello check hello check hello check hello"
+  },
+  "keywords": [
+    "nodejs",
+    "api"
+  ],
+  "author": "Sathyapriyan",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "express": "^4.16.3",
+    "mongoose": "^5.2.17"
+  }
+}
