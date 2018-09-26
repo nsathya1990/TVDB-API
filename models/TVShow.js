@@ -10,7 +10,7 @@ const tvShowSchema = mongoose.Schema({
     releaseDate: Date,
     budget: Number,
     country: String,
-    showOverview: String,
+    showOverview: String,   
     running_time: String,
     distributor: String,
     rating: Number,

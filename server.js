@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
+const cors = require ('cors');
 
 const tvShowController = require('./controllers/tvshow');
 const userController = require('./controllers/user');
@@ -20,13 +21,24 @@ app.use(bodyParser.urlencoded({
     extended: true
 }))
 
-app.get('/api/tvShows', tvShowController.getTVShows);//for getAll as well as getSome/getOne using query string
-app.post('/api/tvshows', tvShowController.postTVShow); //create record for a TvShow using POST
+app.use(cors());
+
+/* app.get('*', function (req, res) {
+    res.redirect('/#', req.originalUrl);
+}); */
+
+app.get('/api/shows', tvShowController.getTVShows);//for getAll as well as getSome/getOne using query string
+app.post('/api/shows', tvShowController.postTVShow); //create record for a TvShow using POST
+app.get('/api/shows/:id', tvShowController.getTVShow);
+app.post('/api/show/subscribe', userController.ensureAuthenticated, tvShowController.subscribe);
+app.post('/api/show/unsubscribe', userController.ensureAuthenticated, tvShowController.unSubscribe);
 
 app.get('/api/users', userController.getAllUsers);//for getAll as well as getSome/getOne using query string
-app.post('/api/users', userController.postUser); //create record for a User using POST
+//app.post('/api/users', userController.postUser); //create record for a User using POST
+app.post('/api/user/signup', userController.signup);
+app.post('/api/user/login', userController.login);
 
-app.set('port', 3000);
+app.set('port', 3001);
 app.listen(app.get('port'), function() {
-    console.log('the server is working');
+    console.log('Express server listening on port ' + app.get('port'));
 })
