@@ -28,13 +28,13 @@ app.use(cors());
 }); */
 
 app.get('/api/shows', tvShowController.getTVShows);//for getAll as well as getSome/getOne using query string
-app.post('/api/shows', tvShowController.postTVShow); //create record for a TvShow using POST
+app.post('/api/show', tvShowController.postTVShow); //create record for a TvShow using POST in local DB
+
 app.get('/api/shows/:id', tvShowController.getTVShow);
 app.post('/api/show/subscribe', userController.ensureAuthenticated, tvShowController.subscribe);
 app.post('/api/show/unsubscribe', userController.ensureAuthenticated, tvShowController.unSubscribe);
 
-app.get('/api/users', userController.getAllUsers);//for getAll as well as getSome/getOne using query string
-//app.post('/api/users', userController.postUser); //create record for a User using POST
+app.get('/api/users', userController.getAllUsers);
 app.post('/api/user/signup', userController.signup);
 app.post('/api/user/login', userController.login);
 
