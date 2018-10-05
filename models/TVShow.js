@@ -3,9 +3,11 @@ const mongoose = require('mongoose');
 const tvShowSchema = mongoose.Schema({
     _id: Number,
     name: String,
+    actors: [String],
     airsDayOfWeek: String,
     airsTime: String,
     firstAired: Date,
+    finaleaired: Date,
     genre: [String],
     network: String,
     overview: String,

@@ -1,8 +1,15 @@
 const request = require('request');
 const xml2js = require('xml2js');
 const async = require('async');
+const _ = require('lodash');
+const rp = require('request-promise-native');
 
 const TVShow = require('../models/TVShow');
+
+var parser = xml2js.Parser({
+    explicitArray: false,
+    normalizeTags: true
+});
 
 exports.getTVShows = function (req, res, next) {
 
@@ -10,227 +17,228 @@ exports.getTVShows = function (req, res, next) {
     var url = "http://thetvdb.com/api/GetSeries.php?seriesname=";
     var showDetailsUrl;
     var posterUrl;
-    var apiKey = '9EF1D1E7D28FDA0B';
-    var seriesId;
+    var seriesids = [];
     var poster;
 
-    var shows = new Array();
-
-    var parser = xml2js.Parser({
-        explicitArray: false,
-        normalizeTags: true
-    });
+    var username = "nsathya1990tm7";
+    var userkey = "KZDF4DJ2VBYSLX5Y";
+    var apikey = "GZW3FBA4YC4GAT75";
+    var jwtToken;
 
     if (req.query.seriesname) {
+
         showName = req.query.seriesname.toLowerCase();
-        url = url + showName;
+        url += showName;
 
         async.waterfall([
+
+            // Function 1: to retrieve JWT token
             function (callback) {
-                request(url, function (error, response, body) {
-                    if (error) {
-                        console.log('error:', error); // Print the error if one occurred
-                        return next(error);
+                var loginUrl = "https://api.thetvdb.com/login";
+                var formData = {
+                    "apikey": apikey,
+                    "userkey": userkey,
+                    "username": username
+                };
+                var headers = {
+                    "Content-Type": "application/json"
+                }
+                request({
+                    method: 'POST',
+                    headers: headers,
+                    url: loginUrl,
+                    body: formData,
+                    json: true
+                }, function (err, httpResponse, body) {
+                    if (err) {
+                        return console.error('upload failed:', err);
                     }
-                    //console.log('statusCode:', response && response.statusCode);
-                    parser.parseString(body, function (err, result) {
-                        if (!result.data.series) {
-                            return res.send(404, { message: showName + ' was not found. ' });
-                        }
-                        console.log('isArray(show-name):', Array.isArray(result.data.series));
-                        var seriesId = result.data.series.seriesid || result.data.series[0].seriesid;
-                        callback(err, seriesId);
-                    });
+                    jwtToken = body.token;
+                    callback(null, jwtToken);
                 });
             },
-            function (seriesId, callback) {
-                console.log('seriesid:', seriesId);
 
-                showDetailsUrl = "http://thetvdb.com/api/";
-                showDetailsUrl = showDetailsUrl + apiKey + "/series/" + seriesId + "/all/en.xml";
-                //console.log("Show details url:", showDetailsUrl);
-                request(showDetailsUrl, function (sDetailsError, sDetailsResponse, sDetailsBody) {
-                    if (sDetailsError) {
-                        return next(sDetailsError);
-                    }
-                    parser.parseString(sDetailsBody, function (err, sDetailsResult) {
-                        if (!sDetailsResult.data.series) {
-                            return res.send(404, { message: showName + ' was not found. ' });
-                        }
-                        var series = sDetailsResult.data.series;
-                        var episodes = sDetailsResult.data.episode;
+            // Function 2: to retrieve show ids
+            function (token, callback) {
 
-                        poster = series.poster;// || result.data.series[0].poster;
-                        posterUrl = "http://thetvdb.com/banners/";
-                        posterUrl += poster;
-                        //console.log("posterUrl:", posterUrl);
-
-                        var show = new TVShow({
-                            _id: series.id,
-                            name: series.seriesname,
-                            poster: posterUrl,
-                            episodeCount: episodes.length
-                        });
-                        //console.log("show:", show);
-                        shows.push(show);
-                        shows.push(show);
-                        shows.push(show);
-                        shows.push(show);
-                        shows.push(show);
-                        shows.push(show);
-                        console.log("shows:", shows);
-                        res.json({
-                            data: shows
-                        });
-                    });
-                });
-            }
-        ]);
-        /* request(url, function (error, response, body) {
-            if (error) {
-                console.log('error:', error); // Print the error if one occurred
-                return next(error);
-            }
-            console.log('statusCode:', response && response.statusCode); // Print the response status code if a response was received
-
-            parser.parseString(body, function (err, result) {
-                if (!result.data.series) {
-                    return res.send(404, { message: showName + ' was not found. ' });
+                var authorization = "Bearer " + token
+                var header = {
+                    "Content-Type": "application/json",
+                    "Authorization": authorization,
+                    "Accept": "application/json"
                 }
-                console.log('Array.isArray(result.data.series):', Array.isArray(result.data.series));
+                var showSearchUrl = "https://api.thetvdb.com/search/series?";
+                var queryString = { 'name': showName };
+                request({
+                    method: 'GET',
+                    headers: header,
+                    url: showSearchUrl,
+                    qs: queryString,
+                    json: true
+                }, function (error, response, seriesData) {
+                    if (error) {
+                        return next(error);
+                    }
+                    callback(null, token, seriesData.data);
+                });
+            },
 
-                if (Array.isArray(result.data.series)) {
-                    
-                    result.data.series.forEach(element => {
+            // Function 3: to retrieve show details using id
+            function (token, shows) {
 
-                        show = new TVShow();
-                        show.name = element.seriesname;
-                        show.overview = element.overview;
-                        show.firstAired = element.firstaired;
-                        show._id = element.seriesid;
+                console.log("Array.isArray(shows):", Array.isArray(shows));
+                if (Array.isArray(shows)) {
 
-                        showDetailsUrl = "http://thetvdb.com/api/";
-                        showDetailsUrl = showDetailsUrl + apiKey + "/series/" + element.seriesid + "/all/en.xml";
-                        console.log("Show details url:", showDetailsUrl);
-                        request(showDetailsUrl, function (sDetailsError, sDetailsResponse, sDetailsBody) {
-                            if (sDetailsError) {
-                                return next(sDetailsError);
-                            }
-                            parser.parseString(sDetailsBody, function (err, sDetailsResult) {
-                                if (!sDetailsResult.data.series) {
-                                    return res.send(404, { message: showName + ' was not found. ' });
-                                }
-                                poster = sDetailsResult.data.series.poster || result.data.series[0].poster;
-                                posterUrl = "http://thetvdb.com/banners/";
-                                posterUrl += poster;
-                                show.poster = posterUrl;
-                                show.network = sDetailsResult.data.series.network;
-                                show.airsTime = sDetailsResult.data.series.airs_time;
-                                show.status = sDetailsResult.data.series.status;
-                                show.airsDayOfWeek = sDetailsResult.data.series.airs_dayofweek;
-                                show.episodeCount = sDetailsResult.data.episode.length;
-                            });
+                    var series = shows.map(show => {
+                        var show = new TVShow({
+                            name: show.seriesName,
+                            _id: show.id
                         });
-                        shows.push(show);
+                        return show
                     });
-                    console.log("Array shows:", shows);
-                    res.json({
-                        data: shows
-                    });
+
+                    var authorization = "Bearer " + token
+                    var header = {
+                        "Content-Type": "application/json",
+                        "Authorization": authorization,
+                        "Accept": "application/json"
+                    }
+                    var promises = series.map((show) =>
+                        new Promise(function (rs, rj) {
+                            rp({
+                                method: 'GET',
+                                headers: header,
+                                url: "https://api.thetvdb.com/series/" + show.id + "/images/query?keyType=poster",
+                                json: true
+                            }).then(function (posters) {
+
+                                show.poster = "https://www.thetvdb.com/banners/" + posters.data[0].fileName;
+                                rs(show);
+                            }).catch(function (error) {
+                                console.error("error:", show.id);
+                            });
+                        })
+                    );
+
+                    Promise.all(promises)
+                        .then((shows) => {
+                            console.log("Promise All");
+                            console.log("SHOWS:", shows);
+                            res.json({ "data": shows });
+                        })
+                        .catch(error => {
+                            console.error("Msg", error);
+                        });
                 }
                 else {
-                    console.log("[ELSE] seriesid:", result.data.series.seriesid);
-
-                    show = new TVShow();
-                    show._id = result.data.series.seriesid;
-                    show.name = result.data.series.seriesname;
-                    show.overview = result.data.series.overview;
-                    show.firstAired = result.data.series.firstaired;
-
-                    showDetailsUrl = "http://thetvdb.com/api/";
-                    showDetailsUrl = showDetailsUrl + apiKey + "/series/" + result.data.series.seriesid + "/all/en.xml";
-                    console.log("Show details url:", showDetailsUrl);
-
-                    request(showDetailsUrl, function (sDetailsError, sDetailsResponse, sDetailsBody) {
-                        if (sDetailsError) {
-                            return next(sDetailsError);
-                        }
-                        console.log("Show details status code:", sDetailsResponse && sDetailsResponse.statusCode);
-                        parser.parseString(sDetailsBody, function (err, sDetailsResult) {
-                            if (!sDetailsResult.data.series) {
-                                return res.send(404, { message: showName + ' was not found. ' });
-                            }
-                            poster = sDetailsResult.data.series.poster || result.data.series[0].poster;
-                            posterUrl = "http://thetvdb.com/banners/";
-                            posterUrl += poster;
-
-                            show.network = sDetailsResult.data.series.network;
-                            show.airsTime = sDetailsResult.data.series.airs_time;
-                            show.status = sDetailsResult.data.series.status;
-                            show.airsDayOfWeek = sDetailsResult.data.series.airs_dayofweek;
-                            show.episodeCount = sDetailsResult.data.episode.length;
-                            show.poster = posterUrl;
-
-                            res.json({
-                                data: show
-                            });
-                        });
-                    });
+                    console.log("ELSE", shows);
+                    res.json(shows);
                 }
-            });
-        }); */
+
+            }
+        ]);
     }
 }
 
-exports.getTVShow = function (req, res, next) {
-    Show.findById(req.params.id, function (err, show) {
-        if (err) return next(err);
-        res.send(show);
-    });
+exports.postTVShow = function (req, resp, next) {
+
+    var apikey = "9EF1D1E7D28FDA0B";
+
+    showDetailsUrl = "http://thetvdb.com/api/";
+    showDetailsUrl = showDetailsUrl + apikey + "/series/" + req.body._id + "/all/en.xml";
+
+    async.waterfall([
+        function (callback) {
+            request(showDetailsUrl, function (err, response, body) {
+
+                if (err) {
+                    return next(err);
+                }
+                parser.parseString(body, function (err, showDetailsResult) {
+                    if (!showDetailsResult.data.series) {
+                        return resp.send(404, { message: showName + ' was not found. ' });
+                    }
+                    var series = showDetailsResult.data.series;
+                    var episodes = showDetailsResult.data.episode;
+                    //console.log("parseString O/P series", series);
+
+                    poster = series.poster;
+                    posterUrl = "http://thetvdb.com/banners/";
+                    posterUrl += poster;
+
+                    var genre = series.genre.split(['|']).filter(function (x) {
+                        return (x !== (undefined || null || ''));
+                    });
+                    var actors = series.actors.split('|').filter(function (x) {
+                        return (x !== (undefined || null || ''));
+                    });
+
+                    var show = new TVShow({
+                        _id: series.id,
+                        name: series.seriesname,
+                        actors: actors,
+                        airsDayOfWeek: series.airs_dayofweek,
+                        airsTime: series.airs_time,
+                        firstAired: series.firstaired,
+                        finaleaired: series.finale_aired,
+                        genre: genre,
+                        network: series.network,
+                        overview: series.overview,
+                        rating: series.rating,
+                        ratingCount: series.ratingcount,
+                        status: series.status,
+                        poster: posterUrl,
+                        episodeCount: episodes.length,
+                        episodes: []
+                    });
+                    _.each(episodes, function (episode) {
+                        show.episodes.push({
+                            season: episode.seasonnumber,
+                            episodeNumber: episode.episodenumber,
+                            episodeName: episode.episodename,
+                            firstAired: episode.firstaired,
+                            overview: episode.overview
+                        });
+                    });
+                    callback(err, show);
+                });
+            });
+        },
+        function (show, callback) {
+            request({ url: show.poster, encoding: null }, function (error, response, body) {
+                show.poster = 'data:' + response.headers['content-type'] + ';base64,' + body.toString('base64');
+                callback(error, show);
+            });
+        },
+        function (show) {
+            //console.log("333");
+            show.save().then(function (newShow) {
+                resp.json({
+                    message: 'OK',
+                    success: true,
+                    status: 200
+                });
+            });
+        }
+    ]);
 }
 
-exports.postTVShow = function (request, response) {
-
-    console.log("request.body._id:", request.body._id);
-    response.json({
-        data: request.body._id
-    });
-//    response.send({ data: request.body.id });
-    /* var tvShow = new TVShow({
-        name: request.body.name,
-        no_of_seasons: req.body.no_of_seasons,
-        genre: req.body.genre,
-        director: req.body.director,
-        producer: req.body.producer,
-        actors: req.body.actors,
-        releaseDate: req.body.releaseDate,
-        budget: req.body.budget,
-        country: req.body.country,
-        showOverview: req.body.subTitle,
-        running_time: req.body.running_time,
-        distributor: req.body.distributor,
-        rating: req.body.rating,
-        poster: req.body.poster,
-        episodes: []
-    });
-    _.each(episodes, function (episode) {
-        tvShow.episodes.push({
-            season: episode.seasonnumber,
-            episodeNumber: episode.episodenumber,
-            episodeName: episode.episodename,
-            aired: episode.firstaired,
-            overview: episode.overview
-        })
-    });
-    tvShow.save().then(function (error, newTVShow) {
+exports.getAllShowsFromDB = function (request, response, next) {
+    TVShow.find().exec(function (error, shows) {
         if (error) {
-            if (error.code == 11000) {
-                return response.send(409, { message: show.name + ' already exists.' });
-            }
-            return next(error);
+            throw err;
         }
-        res.send(200);
-    }); */
+        if (shows) {
+            response.json({
+                data: shows
+            });
+        }
+        else {
+            response.json({
+                message: "No Data have been found."
+            });
+        }
+    });
 }
 
 exports.subscribe = function (request, response, next) {

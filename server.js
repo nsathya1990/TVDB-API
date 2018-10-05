@@ -2,11 +2,12 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const cors = require ('cors');
+const morgan = require('morgan');
 
 const tvShowController = require('./controllers/tvshow');
 const userController = require('./controllers/user');
 
-mongoose.connect("mongodb://localhost:27017/tvShowDB");
+mongoose.connect("mongodb://localhost:27017/TV-DB");
 mongoose.connection.on('error', function() {
     console.log("Error while connecting to MongoDB");
 });
@@ -22,6 +23,7 @@ app.use(bodyParser.urlencoded({
 }))
 
 app.use(cors());
+app.use(morgan('dev'));
 
 /* app.get('*', function (req, res) {
     res.redirect('/#', req.originalUrl);
@@ -29,8 +31,8 @@ app.use(cors());
 
 app.get('/api/shows', tvShowController.getTVShows);//for getAll as well as getSome/getOne using query string
 app.post('/api/show', tvShowController.postTVShow); //create record for a TvShow using POST in local DB
+app.get('/api/shows-db', tvShowController.getAllShowsFromDB); //retrieve all shows from db
 
-app.get('/api/shows/:id', tvShowController.getTVShow);
 app.post('/api/show/subscribe', userController.ensureAuthenticated, tvShowController.subscribe);
 app.post('/api/show/unsubscribe', userController.ensureAuthenticated, tvShowController.unSubscribe);
 
