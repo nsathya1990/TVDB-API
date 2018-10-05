@@ -67,7 +67,12 @@ exports.signup = function(req, res, next) {
     });
     user.save(function(err) {
       if (err) return next(err);
-      res.send(200);
+      //res.send(200);
+      res.json({
+          data: req.body.name+" registered",
+          message: 'Success',
+          status:200
+        });
     });
 }
 
